@@ -93,6 +93,8 @@ describe("Whispr", () => {
   
     // Create mints
     mint_x = await createMint(provider.connection, admin, admin.publicKey, admin.publicKey, DECIMALS);
+    const info = await provider.connection.getAccountInfo(mint_x);
+console.log("mint_x owner:", info?.owner.toBase58());
     mint_y = await createMint(provider.connection, admin, admin.publicKey, admin.publicKey, DECIMALS);
 
     // Get vault addresses
@@ -105,7 +107,8 @@ describe("Whispr", () => {
 
     await mintTo(provider.connection, admin, mint_x, user_x, admin.publicKey, 1000 * Math.pow(10, DECIMALS));
     await mintTo(provider.connection, admin, mint_y, user_y, admin.publicKey, 1000 * Math.pow(10, DECIMALS));
-
+   
+    
     // Initialize AMM
     await program.methods
       .initializeAmm(seed, fee, admin.publicKey)
@@ -238,7 +241,11 @@ describe("Whispr", () => {
         compDefAccount: getCompDefAccAddress(
           program.programId,
           Buffer.from(getCompDefAccOffset("compute_swap")).readUInt32LE()
-        ),
+        ),  
+        tokenProgram,
+        associatedTokenProgram,
+        systemProgram: SystemProgram.programId,
+      
       })
       .signers([user])
       .rpc({ commitment: "confirmed" });

@@ -13,6 +13,8 @@ declare_id!("AmZXddBcEnTS6T4k8TxDsDx3R5wE16qji67Lwh192a3M");
 
 #[arcium_program]
 pub mod whispr {
+    use arcium_client::idl::arcium::types::CallbackAccount;
+
     use super::*;
 
     // ========================= AMM FUNCTIONALITY =========================
@@ -248,7 +250,62 @@ pub mod whispr {
      
         ];
 
-        queue_computation(ctx.accounts, computation_offset, args, vec![], None)?;
+        queue_computation(ctx.accounts, computation_offset, args, vec![CallbackAccount{
+          
+         pubkey:ctx.accounts.mint_x.key(),
+         is_writable:true
+        },CallbackAccount{
+          
+         pubkey:ctx.accounts.mint_y.key(),
+         is_writable:true
+        },CallbackAccount{
+          
+         pubkey:ctx.accounts.mint_lp.key(),
+         is_writable:true
+        },
+        CallbackAccount{
+          
+         pubkey:ctx.accounts.config.key(),
+         is_writable:true
+        },
+        
+          CallbackAccount{
+          
+         pubkey:ctx.accounts.swap_state.key(),
+         is_writable:true
+        },
+          CallbackAccount{
+          
+         pubkey:ctx.accounts.vault_x.key(),
+         is_writable:true
+        },
+          CallbackAccount{
+          
+         pubkey:ctx.accounts.vault_x.key(),
+         is_writable:true
+        },
+          CallbackAccount{
+          
+         pubkey:ctx.accounts.user_x.key(),
+         is_writable:true
+        },
+          CallbackAccount{
+          
+         pubkey:ctx.accounts.user_y.key(),
+         is_writable:true
+        },
+         CallbackAccount{
+          
+         pubkey:ctx.accounts.token_program.key(),
+         is_writable:false
+        },
+         CallbackAccount{
+          
+         pubkey:ctx.accounts.associated_token_program.key(),
+         is_writable:false
+        }
+
+        ], None)?;
 
         ctx.accounts.swap_state.status = SwapStatus::Computing;
 
@@ -662,9 +719,10 @@ pub struct ComputeSwap<'info> {
     #[account(address = ARCIUM_CLOCK_ACCOUNT_ADDRESS)]
     pub clock_account: Box<Account<'info, ClockAccount>>,
     
-    pub system_program: Program<'info, System>,
+ 
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
+       pub system_program: Program<'info, System>,
     pub arcium_program: Program<'info, Arcium>,
 }
 
@@ -673,7 +731,8 @@ pub struct ComputeSwap<'info> {
 pub struct ComputeSwapCallback<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
-    pub mint_x: Account<'info, Mint>,
+pub mint_x: Account<'info, Mint>,
+
     pub mint_y: Account<'info, Mint>,
     #[account(
         mut,
@@ -723,11 +782,59 @@ pub struct ComputeSwapCallback<'info> {
     #[account(address = ::anchor_lang::solana_program::sysvar::instructions::ID)]
     /// CHECK: instructions_sysvar, checked by the account constraint
     pub instructions_sysvar: AccountInfo<'info>,
+     
     pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+   
     pub arcium_program: Program<'info, Arcium>,
-    pub system_program: Program<'info, System>,
+  
 }
-
+// #[callback_accounts("compute_swap", user)]
+// #[derive(Accounts)]
+// pub struct ComputeSwapCallback<'info> {
+//     #[account(mut)]
+//     pub user: Signer<'info>,
+    
+//     // Use AccountInfo for problematic accounts in callbacks
+//     /// CHECK: Mint X
+//     pub mint_x: AccountInfo<'info>,
+//     /// CHECK: Mint Y
+//     pub mint_y: AccountInfo<'info>,
+//     /// CHECK: LP Mint
+//     #[account(mut)]
+//     pub mint_lp: AccountInfo<'info>,
+    
+//     // Config can stay typed since it's your program's account
+//     pub config: Account<'info, Config>,
+    
+//     #[account(mut)]
+//     pub swap_state: Account<'info, SwapState>,
+    
+//     // Token accounts as AccountInfo
+//     /// CHECK: Vault X
+//     #[account(mut)]
+//     pub vault_x: AccountInfo<'info>,
+//     /// CHECK: Vault Y
+//     #[account(mut)]
+//     pub vault_y: AccountInfo<'info>,
+//     /// CHECK: User X
+//     #[account(mut)]
+//     pub user_x: AccountInfo<'info>,
+//     /// CHECK: User Y
+//     #[account(mut)]
+//     pub user_y: AccountInfo<'info>,
+    
+//     pub comp_def_account: Account<'info, ComputationDefinitionAccount>,
+    
+//     /// CHECK: Instructions sysvar
+//     pub instructions_sysvar: AccountInfo<'info>,
+    
+//     pub token_program: Program<'info, Token>,
+//      pub associated_token_program: Program<'info, AssociatedToken>,
+//        pub system_program: Program<'info, System>,
+//     pub arcium_program: Program<'info, Arcium>,
+  
+// }
 #[init_computation_definition_accounts("compute_swap", payer)]
 #[derive(Accounts)]
 pub struct InitComputeSwapCompDef<'info> {
