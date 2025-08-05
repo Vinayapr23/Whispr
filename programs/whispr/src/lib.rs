@@ -751,6 +751,7 @@ pub struct ComputeSwapCallback<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
     pub arcium_program: Program<'info, Arcium>,
+    #[account(address = derive_comp_def_pda!(COMP_DEF_OFFSET_COMPUTE_SWAP))]
     pub comp_def_account: Box<Account<'info, ComputationDefinitionAccount>>,
     #[account(address = ::anchor_lang::solana_program::sysvar::instructions::ID)]
     /// CHECK: instructions_sysvar, checked by the account constraint
@@ -786,7 +787,6 @@ pub struct ComputeSwapCallback<'info> {
     pub user_x: Account<'info, TokenAccount>,
     #[account(mut)]
     pub user_y: Account<'info, TokenAccount>,
-    #[account(address = derive_comp_def_pda!(COMP_DEF_OFFSET_COMPUTE_SWAP))]
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
