@@ -38,6 +38,7 @@ import {
 import { expect } from "chai";
 import { SystemProgram, Keypair } from "@solana/web3.js";
 import { BN } from "@coral-xyz/anchor";
+import { associatedAddress } from "@coral-xyz/anchor/dist/cjs/utils/token";
 
 describe("Whispr", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
@@ -203,11 +204,14 @@ console.log("mint_x owner:", info?.owner.toBase58());
     const swapStatePda = PublicKey.findProgramAddressSync(
       [
         Buffer.from("swap_state"),
-        user.publicKey.toBuffer(),
-        computationOffset.toArrayLike(Buffer, "le", 8)
+       // user.publicKey.toBuffer()
       ],
       program.programId
     )[0];
+
+
+  console.log(tokenProgram)
+  console.log(associatedTokenProgram)
 
     const queueSig = await program.methods
       .computeSwap(

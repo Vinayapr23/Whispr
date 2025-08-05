@@ -1,10 +1,14 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
-    associated_token::AssociatedToken,
-    token::{burn, mint_to, transfer, Burn, Mint, MintTo, Token, TokenAccount, Transfer},
+    associated_token::{spl_associated_token_account, AssociatedToken},
+    token::{
+        burn, mint_to, spl_token, transfer, Burn, Mint, MintTo, Token, TokenAccount, Transfer,
+    },
 };
 use arcium_anchor::prelude::*;
 use constant_product_curve::ConstantProduct;
+use spl_associated_token_account::id as ASSOCIATED_TOKEN_PROGRAM_ID;
+use spl_token::ID as TOKEN_PROGRAM_ID;
 
 const COMP_DEF_OFFSET_COMPUTE_SWAP: u32 = comp_def_offset("compute_swap");
 
@@ -683,21 +687,21 @@ pub struct ComputeSwap<'info> {
     pub mint_lp: Box<Account<'info, Mint>>,
     #[account(
         mut,
-        associated_token::mint = mint_x,
-        associated_token::authority = config,
+       associated_token::mint = mint_x,
+       associated_token::authority = config,
     )]
     pub vault_x: Box<Account<'info, TokenAccount>>,
     #[account(
         mut,
-        associated_token::mint = mint_y,
-        associated_token::authority = config,
+       associated_token::mint = mint_y,
+       associated_token::authority = config,
     )]
     pub vault_y: Box<Account<'info, TokenAccount>>,
     #[account(
         init,
         payer = user,
         space = SwapState::INIT_SPACE,
-        seeds = [b"swap_state", user.key().as_ref(), computation_offset.to_le_bytes().as_ref()],
+        seeds = [b"swap_state"],
         bump
     )]
     pub swap_state: Box<Account<'info, SwapState>>,
@@ -746,6 +750,12 @@ pub struct ComputeSwap<'info> {
 pub struct ComputeSwapCallback<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
+    pub arcium_program: Program<'info, Arcium>,
+    pub comp_def_account: Box<Account<'info, ComputationDefinitionAccount>>,
+    #[account(address = ::anchor_lang::solana_program::sysvar::instructions::ID)]
+    /// CHECK: instructions_sysvar, checked by the account constraint
+    pub instructions_sysvar: AccountInfo<'info>,
+
     pub mint_x: Account<'info, Mint>,
 
     pub mint_y: Account<'info, Mint>,
@@ -764,44 +774,21 @@ pub struct ComputeSwapCallback<'info> {
     pub config: Account<'info, Config>,
     #[account(
         mut,
-        seeds = [b"swap_state", user.key().as_ref(), swap_state.computation_offset.to_le_bytes().as_ref()],
+        seeds = [b"swap_state"],
         bump
     )]
     pub swap_state: Account<'info, SwapState>,
-    #[account(
-        mut,
-        associated_token::mint = mint_x,
-        associated_token::authority = config,
-    )]
+    #[account(mut)]
     pub vault_x: Account<'info, TokenAccount>,
-    #[account(
-        mut,
-        associated_token::mint = mint_y,
-        associated_token::authority = config,
-    )]
+    #[account(mut)]
     pub vault_y: Account<'info, TokenAccount>,
-    #[account(
-        mut,
-        associated_token::mint = mint_x,
-        associated_token::authority = user,
-    )]
+    #[account(mut)]
     pub user_x: Account<'info, TokenAccount>,
-    #[account(
-        mut,
-        associated_token::mint = mint_y,
-        associated_token::authority = user,
-    )]
+    #[account(mut)]
     pub user_y: Account<'info, TokenAccount>,
     #[account(address = derive_comp_def_pda!(COMP_DEF_OFFSET_COMPUTE_SWAP))]
-    pub comp_def_account: Box<Account<'info, ComputationDefinitionAccount>>,
-    #[account(address = ::anchor_lang::solana_program::sysvar::instructions::ID)]
-    /// CHECK: instructions_sysvar, checked by the account constraint
-    pub instructions_sysvar: AccountInfo<'info>,
-
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
-
-    pub arcium_program: Program<'info, Arcium>,
 }
 // #[callback_accounts("compute_swap", user)]
 // #[derive(Accounts)]
