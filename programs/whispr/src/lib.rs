@@ -494,7 +494,7 @@ pub enum SwapStatus {
 }
 
 impl Space for SwapState {
-    const INIT_SPACE: usize = 8 + 32 + 32 + 8 + 1 + 8 + 8 + 1 + 8;
+    const INIT_SPACE: usize = 8 + 32 + 32 + 8  + 8 + 8 + 1 + 8;
 }
 
 // ========================= AMM ACCOUNTS =========================
