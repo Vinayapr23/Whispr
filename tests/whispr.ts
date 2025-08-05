@@ -1,6 +1,3 @@
-
-
-
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
@@ -26,12 +23,12 @@ import {
 } from "@arcium-hq/client";
 import * as fs from "fs";
 import * as os from "os";
-import { 
-  ASSOCIATED_TOKEN_PROGRAM_ID as associatedTokenProgram, 
-  TOKEN_PROGRAM_ID as tokenProgram, 
-  createMint, 
-  mintTo, 
-  getAssociatedTokenAddress, 
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID as associatedTokenProgram,
+  TOKEN_PROGRAM_ID as tokenProgram,
+  createMint,
+  mintTo,
+  getAssociatedTokenAddress,
   getOrCreateAssociatedTokenAccount,
   getAccount,
 } from "@solana/spl-token";
@@ -66,7 +63,7 @@ describe("Whispr", () => {
   const fee = 300;
   const DECIMALS = 6;
   const config = PublicKey.findProgramAddressSync(
-    [Buffer.from("config"), seed.toArrayLike(Buffer, "le", 8)], 
+    [Buffer.from("config"), seed.toArrayLike(Buffer, "le", 8)],
     program.programId
   )[0];
   let mint_x: PublicKey;
@@ -83,33 +80,79 @@ describe("Whispr", () => {
 
   before("Setup AMM", async () => {
     // Airdrop
-    await Promise.all([admin, user].map(async (k) => {
-      const sig = await provider.connection.requestAirdrop(k.publicKey, 100 * anchor.web3.LAMPORTS_PER_SOL);
-      const latestBlockhash = await provider.connection.getLatestBlockhash();
-      await provider.connection.confirmTransaction({
-        signature: sig,
-        ...latestBlockhash,
-      });
-    }));
-  
+    await Promise.all(
+      [admin, user].map(async (k) => {
+        const sig = await provider.connection.requestAirdrop(
+          k.publicKey,
+          100 * anchor.web3.LAMPORTS_PER_SOL
+        );
+        const latestBlockhash = await provider.connection.getLatestBlockhash();
+        await provider.connection.confirmTransaction({
+          signature: sig,
+          ...latestBlockhash,
+        });
+      })
+    );
+
     // Create mints
-    mint_x = await createMint(provider.connection, admin, admin.publicKey, admin.publicKey, DECIMALS);
+    mint_x = await createMint(
+      provider.connection,
+      admin,
+      admin.publicKey,
+      admin.publicKey,
+      DECIMALS
+    );
     const info = await provider.connection.getAccountInfo(mint_x);
-console.log("mint_x owner:", info?.owner.toBase58());
-    mint_y = await createMint(provider.connection, admin, admin.publicKey, admin.publicKey, DECIMALS);
+    console.log("mint_x owner:", info?.owner.toBase58());
+    mint_y = await createMint(
+      provider.connection,
+      admin,
+      admin.publicKey,
+      admin.publicKey,
+      DECIMALS
+    );
 
     // Get vault addresses
     vault_x = await getAssociatedTokenAddress(mint_x, config, true);
     vault_y = await getAssociatedTokenAddress(mint_y, config, true);
 
     // Create user accounts and mint tokens
-    user_x = (await getOrCreateAssociatedTokenAccount(provider.connection, user, mint_x, user.publicKey, true)).address;
-    user_y = (await getOrCreateAssociatedTokenAccount(provider.connection, user, mint_y, user.publicKey, true)).address;
+    user_x = (
+      await getOrCreateAssociatedTokenAccount(
+        provider.connection,
+        user,
+        mint_x,
+        user.publicKey,
+        true
+      )
+    ).address;
+    user_y = (
+      await getOrCreateAssociatedTokenAccount(
+        provider.connection,
+        user,
+        mint_y,
+        user.publicKey,
+        true
+      )
+    ).address;
 
-    await mintTo(provider.connection, admin, mint_x, user_x, admin.publicKey, 1000 * Math.pow(10, DECIMALS));
-    await mintTo(provider.connection, admin, mint_y, user_y, admin.publicKey, 1000 * Math.pow(10, DECIMALS));
-   
-    
+    await mintTo(
+      provider.connection,
+      admin,
+      mint_x,
+      user_x,
+      admin.publicKey,
+      1000 * Math.pow(10, DECIMALS)
+    );
+    await mintTo(
+      provider.connection,
+      admin,
+      mint_y,
+      user_y,
+      admin.publicKey,
+      1000 * Math.pow(10, DECIMALS)
+    );
+
     // Initialize AMM
     await program.methods
       .initializeAmm(seed, fee, admin.publicKey)
@@ -129,10 +172,22 @@ console.log("mint_x owner:", info?.owner.toBase58());
       .rpc();
 
     // Deposit liquidity
-    user_lp = (await getOrCreateAssociatedTokenAccount(provider.connection, user, mint_lp, user.publicKey, true)).address;
+    user_lp = (
+      await getOrCreateAssociatedTokenAccount(
+        provider.connection,
+        user,
+        mint_lp,
+        user.publicKey,
+        true
+      )
+    ).address;
 
     await program.methods
-      .deposit(new BN(1000 * Math.pow(10, DECIMALS)), new BN(200 * Math.pow(10, DECIMALS)), new BN(200 * Math.pow(10, DECIMALS)))
+      .deposit(
+        new BN(1000 * Math.pow(10, DECIMALS)),
+        new BN(200 * Math.pow(10, DECIMALS)),
+        new BN(200 * Math.pow(10, DECIMALS))
+      )
       .accountsStrict({
         user: user.publicKey,
         mintX: mint_x,
@@ -151,20 +206,19 @@ console.log("mint_x owner:", info?.owner.toBase58());
       .signers([user])
       .rpc();
 
-       const vaultXAcc = await getAccount(provider.connection, vault_x);
-  const vaultYAcc = await getAccount(provider.connection, vault_y);
-  const userXAcc  = await getAccount(provider.connection, user_x);
-  const userYAcc  = await getAccount(provider.connection, user_y);
-  const userLpAcc = await getAccount(provider.connection, user_lp);
+    const vaultXAcc = await getAccount(provider.connection, vault_x);
+    const vaultYAcc = await getAccount(provider.connection, vault_y);
+    const userXAcc = await getAccount(provider.connection, user_x);
+    const userYAcc = await getAccount(provider.connection, user_y);
+    const userLpAcc = await getAccount(provider.connection, user_lp);
 
-  console.log("=== AMM Token Balances ===");
-  console.log("Vault X:", Number(vaultXAcc.amount)  / 10**DECIMALS);
-  console.log("Vault Y:", Number(vaultYAcc.amount)  / 10**DECIMALS);
-  console.log("User  X:", Number(userXAcc.amount)   / 10**DECIMALS);
-  console.log("User  Y:", Number(userYAcc.amount)   / 10**DECIMALS);
-  console.log("User LP:", Number(userLpAcc.amount)  / 10**DECIMALS);
+    console.log("=== AMM Token Balances ===");
+    console.log("Vault X:", Number(vaultXAcc.amount) / 10 ** DECIMALS);
+    console.log("Vault Y:", Number(vaultYAcc.amount) / 10 ** DECIMALS);
+    console.log("User  X:", Number(userXAcc.amount) / 10 ** DECIMALS);
+    console.log("User  Y:", Number(userYAcc.amount) / 10 ** DECIMALS);
+    console.log("User LP:", Number(userLpAcc.amount) / 10 ** DECIMALS);
   });
-
 
   it("execute confidential swap", async () => {
     const owner = readKpJson(`${os.homedir()}/.config/solana/id.json`);
@@ -197,31 +251,31 @@ console.log("mint_x owner:", info?.owner.toBase58());
     const ciphertextAmount = cipher.encrypt([swapAmount], nonce);
     const ciphertextMinOutput = cipher.encrypt([minOutput], nonce);
 
-    const swapExecutedEventPromise = awaitEvent("confidentialSwapExecutedEvent");
+    const swapExecutedEventPromise = awaitEvent(
+      "confidentialSwapExecutedEvent"
+    );
 
     const computationOffset = new anchor.BN(randomBytes(8), "hex");
 
     const swapStatePda = PublicKey.findProgramAddressSync(
       [
         Buffer.from("swap_state"),
-       // user.publicKey.toBuffer()
+        // user.publicKey.toBuffer()
       ],
       program.programId
     )[0];
 
-
-  console.log(tokenProgram)
-  console.log(associatedTokenProgram)
+    console.log(tokenProgram);
+    console.log(associatedTokenProgram);
 
     const queueSig = await program.methods
       .computeSwap(
         computationOffset,
-         Array.from(publicKey),
+        Array.from(publicKey),
         new anchor.BN(deserializeLE(nonce).toString()),
-      //  Array.from(ciphertextIsX[0]),
-        Array.from(ciphertextAmount[0]),
-      //  Array.from(ciphertextMinOutput[0]),
-
+        //  Array.from(ciphertextIsX[0]),
+        Array.from(ciphertextAmount[0])
+        //  Array.from(ciphertextMinOutput[0]),
       )
       .accountsPartial({
         user: user.publicKey,
@@ -245,16 +299,15 @@ console.log("mint_x owner:", info?.owner.toBase58());
         compDefAccount: getCompDefAccAddress(
           program.programId,
           Buffer.from(getCompDefAccOffset("compute_swap")).readUInt32LE()
-        ),  
+        ),
         tokenProgram,
         associatedTokenProgram,
         systemProgram: SystemProgram.programId,
-      
       })
       .signers([user])
       .rpc({ commitment: "confirmed" });
     console.log("Queue sig is ", queueSig);
-    
+
     const finalizeSig = await awaitComputationFinalization(
       provider as anchor.AnchorProvider,
       computationOffset,
@@ -267,20 +320,6 @@ console.log("mint_x owner:", info?.owner.toBase58());
 
     console.log(swapExecutedEvent);
   });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   async function initComputeSwapCompDef(
     program: Program<Whispr>,
