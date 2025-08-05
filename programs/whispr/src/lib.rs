@@ -1,10 +1,9 @@
-
 use anchor_lang::prelude::*;
-use arcium_anchor::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
-    token::{mint_to, transfer, burn, Burn, Mint, MintTo, Token, TokenAccount, Transfer}
+    token::{burn, mint_to, transfer, Burn, Mint, MintTo, Token, TokenAccount, Transfer},
 };
+use arcium_anchor::prelude::*;
 use constant_product_curve::ConstantProduct;
 
 const COMP_DEF_OFFSET_COMPUTE_SWAP: u32 = comp_def_offset("compute_swap");
@@ -18,7 +17,12 @@ pub mod whispr {
     use super::*;
 
     // ========================= AMM FUNCTIONALITY =========================
-    pub fn initialize_amm(ctx: Context<InitializeAmm>, seed: u64, fee: u16, authority: Option<Pubkey>) -> Result<()> {
+    pub fn initialize_amm(
+        ctx: Context<InitializeAmm>,
+        seed: u64,
+        fee: u16,
+        authority: Option<Pubkey>,
+    ) -> Result<()> {
         ctx.accounts.config.set_inner(Config {
             seed,
             authority,
@@ -29,7 +33,7 @@ pub mod whispr {
             config_bump: ctx.bumps.config,
             lp_bump: ctx.bumps.mint_lp,
         });
-        
+
         emit!(InitializeEvent {
             admin: ctx.accounts.admin.key(),
             mint_x: ctx.accounts.mint_x.key(),
@@ -47,16 +51,20 @@ pub mod whispr {
         require!(ctx.accounts.config.locked == false, ErrorCode::PoolLocked);
         require!(amount != 0, ErrorCode::InvalidAmount);
 
-        let (x, y) = match ctx.accounts.mint_lp.supply == 0 && ctx.accounts.vault_x.amount == 0 && ctx.accounts.vault_y.amount == 0 {
+        let (x, y) = match ctx.accounts.mint_lp.supply == 0
+            && ctx.accounts.vault_x.amount == 0
+            && ctx.accounts.vault_y.amount == 0
+        {
             true => (max_x, max_y),
             false => {
                 let amounts = ConstantProduct::xy_deposit_amounts_from_l(
-                    ctx.accounts.vault_x.amount, 
-                    ctx.accounts.vault_y.amount, 
-                    ctx.accounts.mint_lp.supply, 
-                    amount, 
-                    6
-                ).unwrap();
+                    ctx.accounts.vault_x.amount,
+                    ctx.accounts.vault_y.amount,
+                    ctx.accounts.mint_lp.supply,
+                    amount,
+                    6,
+                )
+                .unwrap();
                 (amounts.x, amounts.y)
             }
         };
@@ -71,9 +79,9 @@ pub mod whispr {
                     from: ctx.accounts.user_x.to_account_info(),
                     to: ctx.accounts.vault_x.to_account_info(),
                     authority: ctx.accounts.user.to_account_info(),
-                }
+                },
             ),
-            x
+            x,
         )?;
 
         transfer(
@@ -83,16 +91,16 @@ pub mod whispr {
                     from: ctx.accounts.user_y.to_account_info(),
                     to: ctx.accounts.vault_y.to_account_info(),
                     authority: ctx.accounts.user.to_account_info(),
-                }
+                },
             ),
-            y
+            y,
         )?;
 
         // Mint LP tokens
         let seeds = &[
             &b"config"[..],
             &ctx.accounts.config.seed.to_le_bytes(),
-            &[ctx.accounts.config.config_bump]
+            &[ctx.accounts.config.config_bump],
         ];
         let signer_seeds = &[&seeds[..]];
 
@@ -104,9 +112,9 @@ pub mod whispr {
                     to: ctx.accounts.user_lp.to_account_info(),
                     authority: ctx.accounts.config.to_account_info(),
                 },
-                signer_seeds
+                signer_seeds,
             ),
-            amount
+            amount,
         )?;
 
         emit!(DepositEvent {
@@ -121,21 +129,25 @@ pub mod whispr {
     pub fn withdraw(ctx: Context<Withdraw>, amount: u64, min_x: u64, min_y: u64) -> Result<()> {
         require!(ctx.accounts.config.locked == false, ErrorCode::PoolLocked);
         require!(amount != 0, ErrorCode::InvalidAmount);
-        
+
         let amounts = ConstantProduct::xy_withdraw_amounts_from_l(
-            ctx.accounts.vault_x.amount, 
-            ctx.accounts.vault_y.amount, 
-            ctx.accounts.mint_lp.supply, 
-            amount, 
-            6
-        ).map_err(|_| ErrorCode::InvalidAmount)?;
-        
-        require!(amounts.x >= min_x && amounts.y >= min_y, ErrorCode::SlippageExceded);
+            ctx.accounts.vault_x.amount,
+            ctx.accounts.vault_y.amount,
+            ctx.accounts.mint_lp.supply,
+            amount,
+            6,
+        )
+        .map_err(|_| ErrorCode::InvalidAmount)?;
+
+        require!(
+            amounts.x >= min_x && amounts.y >= min_y,
+            ErrorCode::SlippageExceded
+        );
 
         let seeds = &[
             &b"config"[..],
             &ctx.accounts.config.seed.to_le_bytes(),
-            &[ctx.accounts.config.config_bump]
+            &[ctx.accounts.config.config_bump],
         ];
         let signer_seeds = &[&seeds[..]];
 
@@ -148,9 +160,9 @@ pub mod whispr {
                     to: ctx.accounts.user_x.to_account_info(),
                     authority: ctx.accounts.config.to_account_info(),
                 },
-                signer_seeds
+                signer_seeds,
             ),
-            amounts.x
+            amounts.x,
         )?;
 
         transfer(
@@ -161,9 +173,9 @@ pub mod whispr {
                     to: ctx.accounts.user_y.to_account_info(),
                     authority: ctx.accounts.config.to_account_info(),
                 },
-                signer_seeds
+                signer_seeds,
             ),
-            amounts.y
+            amounts.y,
         )?;
 
         // Burn LP tokens
@@ -174,9 +186,9 @@ pub mod whispr {
                     mint: ctx.accounts.mint_lp.to_account_info(),
                     from: ctx.accounts.user_lp.to_account_info(),
                     authority: ctx.accounts.user.to_account_info(),
-                }
+                },
             ),
-            amount
+            amount,
         )?;
 
         emit!(WithdrawEvent {
@@ -189,7 +201,10 @@ pub mod whispr {
     }
 
     pub fn lock(ctx: Context<Update>) -> Result<()> {
-        require!(ctx.accounts.config.authority == Some(ctx.accounts.user.key()), ErrorCode::InvalidAuthority);
+        require!(
+            ctx.accounts.config.authority == Some(ctx.accounts.user.key()),
+            ErrorCode::InvalidAuthority
+        );
         ctx.accounts.config.locked = true;
         emit!(LockEvent {
             user: ctx.accounts.user.key(),
@@ -199,7 +214,10 @@ pub mod whispr {
     }
 
     pub fn unlock(ctx: Context<Update>) -> Result<()> {
-        require!(ctx.accounts.config.authority == Some(ctx.accounts.user.key()), ErrorCode::InvalidAuthority);
+        require!(
+            ctx.accounts.config.authority == Some(ctx.accounts.user.key()),
+            ErrorCode::InvalidAuthority
+        );
         ctx.accounts.config.locked = false;
         emit!(UnlockEvent {
             user: ctx.accounts.user.key(),
@@ -217,12 +235,11 @@ pub mod whispr {
     pub fn compute_swap(
         ctx: Context<ComputeSwap>,
         computation_offset: u64,
-         pub_key: [u8; 32],
-          nonce: u128,
-       // encrypted_is_x: [u8; 32],      // Encrypted bool (as u8)
-        encrypted_amount: [u8; 32],     // Encrypted u64
-       // encrypted_min_output: [u8; 32], // Encrypted u64
-    
+        pub_key: [u8; 32],
+        nonce: u128,
+        // encrypted_is_x: [u8; 32],      // Encrypted bool (as u8)
+        encrypted_amount: [u8; 32], // Encrypted u64
+                                    // encrypted_min_output: [u8; 32], // Encrypted u64
     ) -> Result<()> {
         require!(ctx.accounts.config.locked == false, ErrorCode::PoolLocked);
 
@@ -231,7 +248,7 @@ pub mod whispr {
         ctx.accounts.swap_state.user = ctx.accounts.user.key();
         ctx.accounts.swap_state.config = ctx.accounts.config.key();
         ctx.accounts.swap_state.computation_offset = computation_offset;
-       // ctx.accounts.swap_state.is_x = false;
+        // ctx.accounts.swap_state.is_x = false;
         ctx.accounts.swap_state.amount = 0;
         ctx.accounts.swap_state.min_output = 0;
         ctx.accounts.swap_state.status = SwapStatus::Initiated;
@@ -241,71 +258,66 @@ pub mod whispr {
         let args = vec![
             Argument::ArcisPubkey(pub_key),
             Argument::PlaintextU128(nonce),
-            Argument::EncryptedU64(encrypted_amount),    // amount
-          //  Argument::EncryptedU64(encrypted_min_output), // min_output
-           Argument::PlaintextU64(ctx.accounts.vault_x.amount),
+            Argument::EncryptedU64(encrypted_amount), // amount
+            //  Argument::EncryptedU64(encrypted_min_output), // min_output
+            Argument::PlaintextU64(ctx.accounts.vault_x.amount),
             Argument::PlaintextU64(ctx.accounts.vault_y.amount),
-           Argument::PlaintextU64(ctx.accounts.mint_lp.supply),
-           Argument::PlaintextU16(ctx.accounts.config.fee),
-     
+            Argument::PlaintextU64(ctx.accounts.mint_lp.supply),
+            Argument::PlaintextU16(ctx.accounts.config.fee),
         ];
 
-        queue_computation(ctx.accounts, computation_offset, args, vec![CallbackAccount{
-          
-         pubkey:ctx.accounts.mint_x.key(),
-         is_writable:true
-        },CallbackAccount{
-          
-         pubkey:ctx.accounts.mint_y.key(),
-         is_writable:true
-        },CallbackAccount{
-          
-         pubkey:ctx.accounts.mint_lp.key(),
-         is_writable:true
-        },
-        CallbackAccount{
-          
-         pubkey:ctx.accounts.config.key(),
-         is_writable:true
-        },
-        
-          CallbackAccount{
-          
-         pubkey:ctx.accounts.swap_state.key(),
-         is_writable:true
-        },
-          CallbackAccount{
-          
-         pubkey:ctx.accounts.vault_x.key(),
-         is_writable:true
-        },
-          CallbackAccount{
-          
-         pubkey:ctx.accounts.vault_x.key(),
-         is_writable:true
-        },
-          CallbackAccount{
-          
-         pubkey:ctx.accounts.user_x.key(),
-         is_writable:true
-        },
-          CallbackAccount{
-          
-         pubkey:ctx.accounts.user_y.key(),
-         is_writable:true
-        },
-         CallbackAccount{
-          
-         pubkey:ctx.accounts.token_program.key(),
-         is_writable:false
-        },
-         CallbackAccount{
-          
-         pubkey:ctx.accounts.associated_token_program.key(),
-         is_writable:false
-        }
-
-        ], None)?;
+        queue_computation(
+            ctx.accounts,
+            computation_offset,
+            args,
+            vec![
+                CallbackAccount {
+                    pubkey: ctx.accounts.mint_x.key(),
+                    is_writable: true,
+                },
+                CallbackAccount {
+                    pubkey: ctx.accounts.mint_y.key(),
+                    is_writable: true,
+                },
+                CallbackAccount {
+                    pubkey: ctx.accounts.mint_lp.key(),
+                    is_writable: true,
+                },
+                CallbackAccount {
+                    pubkey: ctx.accounts.config.key(),
+                    is_writable: true,
+                },
+                CallbackAccount {
+                    pubkey: ctx.accounts.swap_state.key(),
+                    is_writable: true,
+                },
+                CallbackAccount {
+                    pubkey: ctx.accounts.vault_x.key(),
+                    is_writable: true,
+                },
+                CallbackAccount {
+                    pubkey: ctx.accounts.vault_x.key(),
+                    is_writable: true,
+                },
+                CallbackAccount {
+                    pubkey: ctx.accounts.user_x.key(),
+                    is_writable: true,
+                },
+                CallbackAccount {
+                    pubkey: ctx.accounts.user_y.key(),
+                    is_writable: true,
+                },
+                CallbackAccount {
+                    pubkey: ctx.accounts.token_program.key(),
+                    is_writable: false,
+                },
+                CallbackAccount {
+                    pubkey: ctx.accounts.associated_token_program.key(),
+                    is_writable: false,
+                },
+            ],
+            None,
+        )?;
 
         ctx.accounts.swap_state.status = SwapStatus::Computing;
 
@@ -329,16 +341,20 @@ pub mod whispr {
             _ => return Err(ErrorCode::AbortedComputation.into()),
         };
 
-
         // Decrypt the results
         // The circuit returns SwapResult with three fields
-        let deposit_amount = u64::from_le_bytes(swap_result.ciphertexts[0][..8].try_into().unwrap());
-        
-        let withdraw_amount = u64::from_le_bytes(swap_result.ciphertexts[1][..8].try_into().unwrap());
+        let deposit_amount =
+            u64::from_le_bytes(swap_result.ciphertexts[0][..8].try_into().unwrap());
+
+        let withdraw_amount =
+            u64::from_le_bytes(swap_result.ciphertexts[1][..8].try_into().unwrap());
         //let is_x = swap_result.ciphertexts[2][0] != 0;
 
         // Validate amounts
-        require!(deposit_amount > 0 || withdraw_amount == 0, ErrorCode::InvalidAmount);
+        require!(
+            deposit_amount > 0 || withdraw_amount == 0,
+            ErrorCode::InvalidAmount
+        );
 
         // If withdraw_amount is 0, it means slippage check failed
         // if withdraw_amount == 0 {
@@ -356,64 +372,64 @@ pub mod whispr {
         let seeds = &[
             &b"config"[..],
             &ctx.accounts.config.seed.to_le_bytes(),
-            &[ctx.accounts.config.config_bump]
+            &[ctx.accounts.config.config_bump],
         ];
         let signer_seeds = &[&seeds[..]];
 
         // Deposit and withdraw tokens based on direction
         //if is_x {
-            // User gives X, gets Y
-            transfer(
-                CpiContext::new(
-                    ctx.accounts.token_program.to_account_info(),
-                    Transfer {
-                        from: ctx.accounts.user_x.to_account_info(),
-                        to: ctx.accounts.vault_x.to_account_info(),
-                        authority: ctx.accounts.user.to_account_info(),
-                    }
-                ),
-                deposit_amount
-            )?;
+        // User gives X, gets Y
+        transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.user_x.to_account_info(),
+                    to: ctx.accounts.vault_x.to_account_info(),
+                    authority: ctx.accounts.user.to_account_info(),
+                },
+            ),
+            deposit_amount,
+        )?;
 
-            transfer(
-                CpiContext::new_with_signer(
-                    ctx.accounts.token_program.to_account_info(),
-                    Transfer {
-                        from: ctx.accounts.vault_y.to_account_info(),
-                        to: ctx.accounts.user_y.to_account_info(),
-                        authority: ctx.accounts.config.to_account_info(),
-                    },
-                    signer_seeds
-                ),
-                withdraw_amount
-            )?;
-    //   //  } else {
-    //         // User gives Y, gets X
-    //         transfer(
-    //             CpiContext::new(
-    //                 ctx.accounts.token_program.to_account_info(),
-    //                 Transfer {
-    //                     from: ctx.accounts.user_y.to_account_info(),
-    //                     to: ctx.accounts.vault_y.to_account_info(),
-    //                     authority: ctx.accounts.user.to_account_info(),
-    //                 }
-    //             ),
-    //             deposit_amount
-    //         )?;
+        transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.vault_y.to_account_info(),
+                    to: ctx.accounts.user_y.to_account_info(),
+                    authority: ctx.accounts.config.to_account_info(),
+                },
+                signer_seeds,
+            ),
+            withdraw_amount,
+        )?;
+        //   //  } else {
+        //         // User gives Y, gets X
+        //         transfer(
+        //             CpiContext::new(
+        //                 ctx.accounts.token_program.to_account_info(),
+        //                 Transfer {
+        //                     from: ctx.accounts.user_y.to_account_info(),
+        //                     to: ctx.accounts.vault_y.to_account_info(),
+        //                     authority: ctx.accounts.user.to_account_info(),
+        //                 }
+        //             ),
+        //             deposit_amount
+        //         )?;
 
-    //         transfer(
-    //             CpiContext::new_with_signer(
-    //                 ctx.accounts.token_program.to_account_info(),
-    //                 Transfer {
-    //                     from: ctx.accounts.vault_x.to_account_info(),
-    //                     to: ctx.accounts.user_x.to_account_info(),
-    //                     authority: ctx.accounts.config.to_account_info(),
-    //                 },
-    //                 signer_seeds
-    //             ),
-    //             withdraw_amount
-    //         )?;
-    //     }
+        //         transfer(
+        //             CpiContext::new_with_signer(
+        //                 ctx.accounts.token_program.to_account_info(),
+        //                 Transfer {
+        //                     from: ctx.accounts.vault_x.to_account_info(),
+        //                     to: ctx.accounts.user_x.to_account_info(),
+        //                     authority: ctx.accounts.config.to_account_info(),
+        //                 },
+        //                 signer_seeds
+        //             ),
+        //             withdraw_amount
+        //         )?;
+        //     }
 
         // Update swap state
         ctx.accounts.swap_state.status = SwapStatus::Executed;
@@ -427,7 +443,7 @@ pub mod whispr {
             computation_offset: ctx.accounts.swap_state.computation_offset,
             deposit_amount,
             withdraw_amount,
-           // is_x,
+            // is_x,
         });
 
         Ok(())
@@ -449,7 +465,7 @@ pub struct Config {
 }
 
 impl Space for Config {
-    const INIT_SPACE: usize = 8 + 8 + 32+1 + 32*2 + 2 + 1 + 1*2;
+    const INIT_SPACE: usize = 8 + 8 + 32 + 1 + 32 * 2 + 2 + 1 + 1 * 2;
 }
 
 #[account]
@@ -457,7 +473,7 @@ pub struct SwapState {
     pub user: Pubkey,
     pub config: Pubkey,
     pub computation_offset: u64,
-  //  pub is_x: bool,
+    //  pub is_x: bool,
     pub amount: u64,
     pub min_output: u64,
     pub status: SwapStatus,
@@ -482,7 +498,7 @@ impl Space for SwapState {
 #[derive(Accounts)]
 #[instruction(seed: u64)]
 pub struct InitializeAmm<'info> {
-    #[account(mut)] 
+    #[account(mut)]
     pub admin: Signer<'info>,
     pub mint_x: Account<'info, Mint>,
     pub mint_y: Account<'info, Mint>,
@@ -639,7 +655,7 @@ pub struct Update<'info> {
         seeds = [b"config", config.seed.to_le_bytes().as_ref()],
         bump = config.config_bump
     )]
-    pub config: Account<'info, Config>
+    pub config: Account<'info, Config>,
 }
 
 // ========================= CONFIDENTIAL SWAP ACCOUNTS =========================
@@ -697,7 +713,7 @@ pub struct ComputeSwap<'info> {
         associated_token::authority = user,
     )]
     pub user_y: Box<Account<'info, TokenAccount>>,
-    
+
     // Arcium required accounts
     #[account(address = derive_mxe_pda!())]
     pub mxe_account: Box<Account<'info, MXEAccount>>,
@@ -718,11 +734,10 @@ pub struct ComputeSwap<'info> {
     pub pool_account: Box<Account<'info, FeePool>>,
     #[account(address = ARCIUM_CLOCK_ACCOUNT_ADDRESS)]
     pub clock_account: Box<Account<'info, ClockAccount>>,
-    
- 
+
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
-       pub system_program: Program<'info, System>,
+    pub system_program: Program<'info, System>,
     pub arcium_program: Program<'info, Arcium>,
 }
 
@@ -731,7 +746,7 @@ pub struct ComputeSwap<'info> {
 pub struct ComputeSwapCallback<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
-pub mint_x: Account<'info, Mint>,
+    pub mint_x: Account<'info, Mint>,
 
     pub mint_y: Account<'info, Mint>,
     #[account(
@@ -782,19 +797,18 @@ pub mint_x: Account<'info, Mint>,
     #[account(address = ::anchor_lang::solana_program::sysvar::instructions::ID)]
     /// CHECK: instructions_sysvar, checked by the account constraint
     pub instructions_sysvar: AccountInfo<'info>,
-     
+
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
-   
+
     pub arcium_program: Program<'info, Arcium>,
-  
 }
 // #[callback_accounts("compute_swap", user)]
 // #[derive(Accounts)]
 // pub struct ComputeSwapCallback<'info> {
 //     #[account(mut)]
 //     pub user: Signer<'info>,
-    
+
 //     // Use AccountInfo for problematic accounts in callbacks
 //     /// CHECK: Mint X
 //     pub mint_x: AccountInfo<'info>,
@@ -803,13 +817,13 @@ pub mint_x: Account<'info, Mint>,
 //     /// CHECK: LP Mint
 //     #[account(mut)]
 //     pub mint_lp: AccountInfo<'info>,
-    
+
 //     // Config can stay typed since it's your program's account
 //     pub config: Account<'info, Config>,
-    
+
 //     #[account(mut)]
 //     pub swap_state: Account<'info, SwapState>,
-    
+
 //     // Token accounts as AccountInfo
 //     /// CHECK: Vault X
 //     #[account(mut)]
@@ -823,17 +837,17 @@ pub mint_x: Account<'info, Mint>,
 //     /// CHECK: User Y
 //     #[account(mut)]
 //     pub user_y: AccountInfo<'info>,
-    
+
 //     pub comp_def_account: Account<'info, ComputationDefinitionAccount>,
-    
+
 //     /// CHECK: Instructions sysvar
 //     pub instructions_sysvar: AccountInfo<'info>,
-    
+
 //     pub token_program: Program<'info, Token>,
 //      pub associated_token_program: Program<'info, AssociatedToken>,
 //        pub system_program: Program<'info, System>,
 //     pub arcium_program: Program<'info, Arcium>,
-  
+
 // }
 #[init_computation_definition_accounts("compute_swap", payer)]
 #[derive(Accounts)]
@@ -905,7 +919,7 @@ pub struct ConfidentialSwapExecutedEvent {
     pub computation_offset: u64,
     pub deposit_amount: u64,
     pub withdraw_amount: u64,
-   // pub is_x: bool,
+    // pub is_x: bool,
 }
 
 #[event]

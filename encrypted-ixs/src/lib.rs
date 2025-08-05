@@ -1,5 +1,3 @@
-
-
 // // use arcis_imports::*;
 
 // // #[encrypted]
@@ -27,37 +25,37 @@
 // //         fee: u16
 // //     ) -> Enc<Shared, SwapResult> {
 // //         let swap = swap_ctxt.to_arcis();
-        
+
 // //         // Implement constant product AMM formula: x * y = k
 // //         let k = vault_x_amount * vault_y_amount;
-        
+
 // //         let (deposit_amount, withdraw_amount) = if swap.is_x {
 // //             // Swapping X for Y
 // //             let new_x = vault_x_amount + swap.amount;
 // //             let new_y = k / new_x;
 // //             let y_out = vault_y_amount - new_y;
-            
+
 // //             // Apply fee (fee is in basis points, so divide by 10000)
 // //             let fee_amount = (y_out * fee as u64) / 10000;
 // //             let final_y_out = y_out - fee_amount;
-            
+
 // //             (swap.amount, final_y_out)
 // //         } else {
 // //             // Swapping Y for X
 // //             let new_y = vault_y_amount + swap.amount;
 // //             let new_x = k / new_y;
 // //             let x_out = vault_x_amount - new_x;
-            
+
 // //             // Apply fee
 // //             let fee_amount = (x_out * fee as u64) / 10000;
 // //             let final_x_out = x_out - fee_amount;
-            
+
 // //             (swap.amount, final_x_out)
 // //         };
 
 // //         // Validate slippage protection
 // //         let slippage_ok = withdraw_amount >= swap.min_output;
-        
+
 // //         let result = SwapResult {
 // //             deposit_amount: if slippage_ok { deposit_amount } else { 0 },
 // //             withdraw_amount: if slippage_ok { withdraw_amount } else { 0 },
@@ -94,40 +92,40 @@
 // // //         let is_x_val = is_x_ctxt.to_arcis();
 // // //         let amount = amount_ctxt.to_arcis();
 // // //         let min_output = min_output_ctxt.to_arcis();
-        
+
 // // //         // Convert u8 to bool
 // // //         let is_x = is_x_val != 0;
-        
+
 // // //         // Implement constant product AMM formula: x * y = k
 // // //         let k = vault_x_amount * vault_y_amount;
-        
+
 // // //         let (deposit_amount, withdraw_amount) = if is_x {
 // // //             // Swapping X for Y
 // // //             let new_x = vault_x_amount + amount;
 // // //             let new_y = k / new_x;
 // // //             let y_out = vault_y_amount - new_y;
-            
+
 // // //             // Apply fee (fee is in basis points, so divide by 10000)
 // // //             let fee_amount = (y_out * fee as u64) / 10000;
 // // //             let final_y_out = y_out - fee_amount;
-            
+
 // // //             (amount, final_y_out)
 // // //         } else {
 // // //             // Swapping Y for X
 // // //             let new_y = vault_y_amount + amount;
 // // //             let new_x = k / new_y;
 // // //             let x_out = vault_x_amount - new_x;
-            
+
 // // //             // Apply fee
 // // //             let fee_amount = (x_out * fee as u64) / 10000;
 // // //             let final_x_out = x_out - fee_amount;
-            
+
 // // //             (amount, final_x_out)
 // // //         };
 
 // // //         // Validate slippage protection
 // // //         let slippage_ok = withdraw_amount >= min_output;
-        
+
 // // //         let result = SwapResult {
 // // //             deposit_amount: if slippage_ok { deposit_amount } else { 0 },
 // // //             withdraw_amount: if slippage_ok { withdraw_amount } else { 0 },
@@ -138,13 +136,6 @@
 // // //         is_x_ctxt.owner.from_arcis(result)
 // // //     }
 // // // }
-
-
-
-
-
-
-
 
 use arcis_imports::*;
 
@@ -169,29 +160,29 @@ mod circuits {
         vault_x_amount: u64,
         vault_y_amount: u64,
         lp_supply: u64,
-        fee: u16
-    ) -> Enc<Shared, SwapResult> {  // Return revealed struct
+        fee: u16,
+    ) -> Enc<Shared, SwapResult> {
+        // Return revealed struct
         let swap_amount = swap_amount_ctxt.to_arcis();
         let amount = swap_amount.amount;
-        
+
         // Implement constant product AMM formula: x * y = k
         let k = vault_x_amount * vault_y_amount;
-        
+
         // Always swapping X for Y
         let new_x = vault_x_amount + amount;
         let new_y = k / new_x;
         let y_out = vault_y_amount - new_y;
-        
+
         // Apply fee
         let fee_amount = (y_out * fee as u64) / 10000;
         let final_y_out = y_out - fee_amount;
 
         let result = SwapResult {
-            deposit_amount:  amount ,
-            withdraw_amount:  final_y_out
-      
+            deposit_amount: amount,
+            withdraw_amount: final_y_out,
         };
 
-     swap_amount_ctxt.owner.from_arcis(result)
+        swap_amount_ctxt.owner.from_arcis(result)
     }
 }
