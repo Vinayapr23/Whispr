@@ -316,10 +316,9 @@ describe("Whispr", () => {
 
     console.log(swapExecutedEvent);
 
-    let deposit = cipher.decrypt([swapExecutedEvent.depositAmount], nonce);
-    let withdraw = cipher.decrypt([swapExecutedEvent.withdrawAmount], nonce);
-    console.log(`deposit amount is ${deposit}`);
-    console.log(`withdraw amount is ${withdraw}`);
+    let output = cipher.decrypt([swapExecutedEvent.depositAmount, swapExecutedEvent.withdrawAmount], swapExecutedEvent.nonce.toArrayLike(Buffer, "le", 16));
+    console.log(`deposit amount is ${output[0]}`);
+    console.log(`withdraw amount is ${output[1]}`);
 
     const executeTx = await program.methods
       .executeSwap()
