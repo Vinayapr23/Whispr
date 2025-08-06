@@ -265,14 +265,11 @@ describe("Whispr", () => {
       program.programId
     )[0];
 
-   
-
     const queueSig = await program.methods
       .computeSwap(
         computationOffset,
         Array.from(publicKey),
         new anchor.BN(deserializeLE(nonce).toString()),
-        //  Array.from(ciphertextIsX[0]),
         Array.from(ciphertextAmount[0])
         //  Array.from(ciphertextMinOutput[0]),
       )
@@ -319,6 +316,11 @@ describe("Whispr", () => {
 
     console.log(swapExecutedEvent);
 
+    let deposit = cipher.decrypt([swapExecutedEvent.depositAmount], nonce);
+    let withdraw = cipher.decrypt([swapExecutedEvent.withdrawAmount], nonce);
+    console.log(`deposit amount is ${deposit}`);
+    console.log(`withdraw amount is ${withdraw}`);
+
     const executeTx = await program.methods
       .executeSwap()
       .accountsPartial({
@@ -331,7 +333,7 @@ describe("Whispr", () => {
         vaultY: vault_y,
         userX: user_x,
         userY: user_y,
-     tokenProgram,
+        tokenProgram,
         associatedTokenProgram,
         systemProgram: SystemProgram.programId,
       })
@@ -339,9 +341,6 @@ describe("Whispr", () => {
       .rpc();
 
     console.log("✓ Swap executed:", executeTx);
-
-
-
   });
 
   async function initComputeSwapCompDef(

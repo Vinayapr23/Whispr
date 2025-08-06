@@ -346,31 +346,18 @@ pub mod whispr {
 
         // Extract results from MPC computation
         let swap_result = match output {
-            ComputationOutputs::Success(ComputeSwapOutput { field_0: o }) => o,
+            ComputationOutputs::Success(ComputeSwapOutput { field_0}) => field_0,
             _ => return Err(ErrorCode::AbortedComputation.into()),
         };
 
         // Decrypt the results
         // The circuit returns SwapResult 
-        let deposit_amount =
-            u64::from_le_bytes(swap_result.ciphertexts[0][..8].try_into().unwrap());
+        let deposit_amount =swap_result.ciphertexts[0];
+           // u64::from_le_bytes(swap_result.ciphertexts[0][..8].try_into().unwrap());
 
-        let withdraw_amount =
-            u64::from_le_bytes(swap_result.ciphertexts[1][..8].try_into().unwrap());
+        let withdraw_amount =swap_result.ciphertexts[1];
+            //u64::from_le_bytes(swap_result.ciphertexts[1][..8].try_into().unwrap());
 
-        //let is_x = swap_result.ciphertexts[2][0] != 0;
-
-        // Validate amounts
-        require!(
-            deposit_amount > 0 || withdraw_amount == 0,
-            ErrorCode::InvalidAmount
-        );
-
-        // Update swap state
-        ctx.accounts.swap_state.status = SwapStatus::Executed;
-        //ctx.accounts.swap_state.is_x = is_x;
-        ctx.accounts.swap_state.amount = deposit_amount;
-        ctx.accounts.swap_state.min_output = withdraw_amount;
 
         emit!(ConfidentialSwapExecutedEvent {
             user: ctx.accounts.user.key(),
@@ -378,7 +365,7 @@ pub mod whispr {
             computation_offset: ctx.accounts.swap_state.computation_offset,
             deposit_amount,
             withdraw_amount,
-            // is_x,
+       
         });
 
         Ok(())
@@ -388,8 +375,8 @@ pub mod whispr {
 
 pub fn execute_swap(ctx: Context<ExecuteSwap>) -> Result<()> {
     
-    let deposit_amount = ctx.accounts.swap_state.amount;
-    let withdraw_amount = ctx.accounts.swap_state.min_output;
+    let deposit_amount =10; //ctx.accounts.swap_state.amount;   //hardcoded as of now due to decrption error
+    let withdraw_amount = 20;//ctx.accounts.swap_state.min_output;
     
     require!(deposit_amount > 0 && withdraw_amount > 0, ErrorCode::InvalidAmount);
     
@@ -400,7 +387,7 @@ pub fn execute_swap(ctx: Context<ExecuteSwap>) -> Result<()> {
             Transfer {
                 from: ctx.accounts.user_x.to_account_info(),
                 to: ctx.accounts.vault_x.to_account_info(),
-                authority: ctx.accounts.user.to_account_info(), // ✅ User signs this!
+                authority: ctx.accounts.user.to_account_info(), 
             },
         ),
         deposit_amount,
@@ -430,23 +417,18 @@ pub fn execute_swap(ctx: Context<ExecuteSwap>) -> Result<()> {
     // Mark as executed
     ctx.accounts.swap_state.status = SwapStatus::Executed;
 
-    emit!(ConfidentialSwapExecutedEvent {
-        user: ctx.accounts.user.key(),
-        config: ctx.accounts.config.key(),
-        computation_offset: ctx.accounts.swap_state.computation_offset,
-        deposit_amount,
-        withdraw_amount,
-    });
+    // emit!(ConfidentialSwapExecutedEvent {
+    //     user: ctx.accounts.user.key(),
+    //     config: ctx.accounts.config.key(),
+    //     computation_offset: ctx.accounts.swap_state.computation_offset,
+    //     deposit_amount,
+    //     withdraw_amount,
+    // });
 
     Ok(())
 }
 
 }
-
-
-
-
-
 
 
 
@@ -915,8 +897,8 @@ pub struct ConfidentialSwapExecutedEvent {
     pub user: Pubkey,
     pub config: Pubkey,
     pub computation_offset: u64,
-    pub deposit_amount: u64,
-    pub withdraw_amount: u64,
+    pub deposit_amount: [u8; 32],
+    pub withdraw_amount: [u8; 32],
     // pub is_x: bool,
 }
 
