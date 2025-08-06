@@ -265,8 +265,7 @@ describe("Whispr", () => {
       program.programId
     )[0];
 
-    console.log(tokenProgram);
-    console.log(associatedTokenProgram);
+   
 
     const queueSig = await program.methods
       .computeSwap(
@@ -319,6 +318,30 @@ describe("Whispr", () => {
     const swapExecutedEvent = await swapExecutedEventPromise;
 
     console.log(swapExecutedEvent);
+
+    const executeTx = await program.methods
+      .executeSwap()
+      .accountsPartial({
+        user: user.publicKey,
+        mintX: mint_x,
+        mintY: mint_y,
+        config: config,
+        swapState: swapStatePda,
+        vaultX: vault_x,
+        vaultY: vault_y,
+        userX: user_x,
+        userY: user_y,
+     tokenProgram,
+        associatedTokenProgram,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([user])
+      .rpc();
+
+    console.log("✓ Swap executed:", executeTx);
+
+
+
   });
 
   async function initComputeSwapCompDef(

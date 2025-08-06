@@ -275,6 +275,10 @@ pub mod whispr {
             computation_offset,
             args,
             vec![
+                 CallbackAccount {
+                    pubkey: ctx.accounts.user.key(),
+                    is_writable: true,
+                },
                 CallbackAccount {
                     pubkey: ctx.accounts.mint_x.key(),
                     is_writable: true,
@@ -339,6 +343,7 @@ pub mod whispr {
         ctx: Context<ComputeSwapCallback>,
         output: ComputationOutputs<ComputeSwapOutput>,
     ) -> Result<()> {
+
         // Extract results from MPC computation
         let swap_result = match output {
             ComputationOutputs::Success(ComputeSwapOutput { field_0: o }) => o,
@@ -346,12 +351,13 @@ pub mod whispr {
         };
 
         // Decrypt the results
-        // The circuit returns SwapResult with three fields
+        // The circuit returns SwapResult 
         let deposit_amount =
             u64::from_le_bytes(swap_result.ciphertexts[0][..8].try_into().unwrap());
 
         let withdraw_amount =
             u64::from_le_bytes(swap_result.ciphertexts[1][..8].try_into().unwrap());
+
         //let is_x = swap_result.ciphertexts[2][0] != 0;
 
         // Validate amounts
@@ -359,81 +365,6 @@ pub mod whispr {
             deposit_amount > 0 || withdraw_amount == 0,
             ErrorCode::InvalidAmount
         );
-
-        // If withdraw_amount is 0, it means slippage check failed
-        // if withdraw_amount == 0 {
-        //     ctx.accounts.swap_state.status = SwapStatus::Failed;
-        //     emit!(ConfidentialSwapFailedEvent {
-        //         user: ctx.accounts.user.key(),
-        //         config: ctx.accounts.config.key(),
-        //         computation_offset: ctx.accounts.swap_state.computation_offset,
-        //         reason: "Slippage protection triggered".to_string(),
-        //     });
-        //     return Ok(());
-        // }
-
-        // Execute token transfers
-        let seeds = &[
-            &b"config"[..],
-            &ctx.accounts.config.seed.to_le_bytes(),
-            &[ctx.accounts.config.config_bump],
-        ];
-        let signer_seeds = &[&seeds[..]];
-
-        // Deposit and withdraw tokens based on direction
-        //if is_x {
-        // User gives X, gets Y
-        transfer(
-            CpiContext::new(
-                ctx.accounts.token_program.to_account_info(),
-                Transfer {
-                    from: ctx.accounts.user_x.to_account_info(),
-                    to: ctx.accounts.vault_x.to_account_info(),
-                    authority: ctx.accounts.user.to_account_info(),
-                },
-            ),
-            deposit_amount,
-        )?;
-
-        transfer(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                Transfer {
-                    from: ctx.accounts.vault_y.to_account_info(),
-                    to: ctx.accounts.user_y.to_account_info(),
-                    authority: ctx.accounts.config.to_account_info(),
-                },
-                signer_seeds,
-            ),
-            withdraw_amount,
-        )?;
-        //   //  } else {
-        //         // User gives Y, gets X
-        //         transfer(
-        //             CpiContext::new(
-        //                 ctx.accounts.token_program.to_account_info(),
-        //                 Transfer {
-        //                     from: ctx.accounts.user_y.to_account_info(),
-        //                     to: ctx.accounts.vault_y.to_account_info(),
-        //                     authority: ctx.accounts.user.to_account_info(),
-        //                 }
-        //             ),
-        //             deposit_amount
-        //         )?;
-
-        //         transfer(
-        //             CpiContext::new_with_signer(
-        //                 ctx.accounts.token_program.to_account_info(),
-        //                 Transfer {
-        //                     from: ctx.accounts.vault_x.to_account_info(),
-        //                     to: ctx.accounts.user_x.to_account_info(),
-        //                     authority: ctx.accounts.config.to_account_info(),
-        //                 },
-        //                 signer_seeds
-        //             ),
-        //             withdraw_amount
-        //         )?;
-        //     }
 
         // Update swap state
         ctx.accounts.swap_state.status = SwapStatus::Executed;
@@ -452,7 +383,75 @@ pub mod whispr {
 
         Ok(())
     }
+
+
+
+pub fn execute_swap(ctx: Context<ExecuteSwap>) -> Result<()> {
+    
+    let deposit_amount = ctx.accounts.swap_state.amount;
+    let withdraw_amount = ctx.accounts.swap_state.min_output;
+    
+    require!(deposit_amount > 0 && withdraw_amount > 0, ErrorCode::InvalidAmount);
+    
+    // NOW user signs and can authorize transfers
+    transfer(
+        CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            Transfer {
+                from: ctx.accounts.user_x.to_account_info(),
+                to: ctx.accounts.vault_x.to_account_info(),
+                authority: ctx.accounts.user.to_account_info(), // ✅ User signs this!
+            },
+        ),
+        deposit_amount,
+    )?;
+
+    // Config authority transfers Y tokens to user
+    let seeds = &[
+        &b"config"[..],
+        &ctx.accounts.config.seed.to_le_bytes(),
+        &[ctx.accounts.config.config_bump],
+    ];
+    let signer_seeds = &[&seeds[..]];
+
+    transfer(
+        CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            Transfer {
+                from: ctx.accounts.vault_y.to_account_info(),
+                to: ctx.accounts.user_y.to_account_info(),
+                authority: ctx.accounts.config.to_account_info(),
+            },
+            signer_seeds,
+        ),
+        withdraw_amount,
+    )?;
+
+    // Mark as executed
+    ctx.accounts.swap_state.status = SwapStatus::Executed;
+
+    emit!(ConfidentialSwapExecutedEvent {
+        user: ctx.accounts.user.key(),
+        config: ctx.accounts.config.key(),
+        computation_offset: ctx.accounts.swap_state.computation_offset,
+        deposit_amount,
+        withdraw_amount,
+    });
+
+    Ok(())
 }
+
+}
+
+
+
+
+
+
+
+
+
+
 
 // ========================= STATE =========================
 
@@ -664,10 +663,12 @@ pub struct Update<'info> {
 
 // ========================= CONFIDENTIAL SWAP ACCOUNTS =========================
 
-#[queue_computation_accounts("compute_swap", user)]
+#[queue_computation_accounts("compute_swap", payer)]
 #[derive(Accounts)]
 #[instruction(computation_offset: u64)]
 pub struct ComputeSwap<'info> {
+   #[account(mut)]
+    pub payer: Signer<'info>,
     #[account(mut)]
     pub user: Signer<'info>,
     pub mint_x: Account<'info, Mint>,
@@ -745,18 +746,20 @@ pub struct ComputeSwap<'info> {
     pub arcium_program: Program<'info, Arcium>,
 }
 
-#[callback_accounts("compute_swap", user)]
+#[callback_accounts("compute_swap", payer)]
 #[derive(Accounts)]
 pub struct ComputeSwapCallback<'info> {
     #[account(mut)]
-    pub user: Signer<'info>,
+    pub payer: Signer<'info>,
     pub arcium_program: Program<'info, Arcium>,
     #[account(address = derive_comp_def_pda!(COMP_DEF_OFFSET_COMPUTE_SWAP))]
     pub comp_def_account: Box<Account<'info, ComputationDefinitionAccount>>,
     #[account(address = ::anchor_lang::solana_program::sysvar::instructions::ID)]
     /// CHECK: instructions_sysvar, checked by the account constraint
     pub instructions_sysvar: AccountInfo<'info>,
-
+    ///CHECK:doc
+    #[account(mut)]
+    pub user: AccountInfo<'info>,
     pub mint_x: Account<'info, Mint>,
 
     pub mint_y: Account<'info, Mint>,
@@ -789,53 +792,14 @@ pub struct ComputeSwapCallback<'info> {
     pub user_y: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
+    
 }
-// #[callback_accounts("compute_swap", user)]
-// #[derive(Accounts)]
-// pub struct ComputeSwapCallback<'info> {
-//     #[account(mut)]
-//     pub user: Signer<'info>,
 
-//     // Use AccountInfo for problematic accounts in callbacks
-//     /// CHECK: Mint X
-//     pub mint_x: AccountInfo<'info>,
-//     /// CHECK: Mint Y
-//     pub mint_y: AccountInfo<'info>,
-//     /// CHECK: LP Mint
-//     #[account(mut)]
-//     pub mint_lp: AccountInfo<'info>,
 
-//     // Config can stay typed since it's your program's account
-//     pub config: Account<'info, Config>,
 
-//     #[account(mut)]
-//     pub swap_state: Account<'info, SwapState>,
 
-//     // Token accounts as AccountInfo
-//     /// CHECK: Vault X
-//     #[account(mut)]
-//     pub vault_x: AccountInfo<'info>,
-//     /// CHECK: Vault Y
-//     #[account(mut)]
-//     pub vault_y: AccountInfo<'info>,
-//     /// CHECK: User X
-//     #[account(mut)]
-//     pub user_x: AccountInfo<'info>,
-//     /// CHECK: User Y
-//     #[account(mut)]
-//     pub user_y: AccountInfo<'info>,
 
-//     pub comp_def_account: Account<'info, ComputationDefinitionAccount>,
 
-//     /// CHECK: Instructions sysvar
-//     pub instructions_sysvar: AccountInfo<'info>,
-
-//     pub token_program: Program<'info, Token>,
-//      pub associated_token_program: Program<'info, AssociatedToken>,
-//        pub system_program: Program<'info, System>,
-//     pub arcium_program: Program<'info, Arcium>,
-
-// }
 #[init_computation_definition_accounts("compute_swap", payer)]
 #[derive(Accounts)]
 pub struct InitComputeSwapCompDef<'info> {
@@ -849,6 +813,53 @@ pub struct InitComputeSwapCompDef<'info> {
     pub arcium_program: Program<'info, Arcium>,
     pub system_program: Program<'info, System>,
 }
+
+
+#[derive(Accounts)]
+pub struct ExecuteSwap<'info> {
+    #[account(mut)]
+    pub user: Signer<'info>,
+    pub mint_x: Account<'info, Mint>,
+
+    pub mint_y: Account<'info, Mint>,
+    #[account(
+        mut,
+        seeds = [b"lp", config.key().as_ref()],
+        bump = config.lp_bump,
+    )]
+    pub mint_lp: Account<'info, Mint>,
+    #[account(
+        seeds = [b"config", config.seed.to_le_bytes().as_ref()],
+        bump = config.config_bump,
+        has_one = mint_x,
+        has_one = mint_y,
+    )]
+    pub config: Account<'info, Config>,
+    #[account(
+        mut,
+        seeds = [b"swap_state"],
+        bump
+    )]
+    pub swap_state: Account<'info, SwapState>,
+    #[account(mut)]
+    pub vault_x: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub vault_y: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub user_x: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub user_y: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+        pub system_program: Program<'info, System>,
+}
+
+
+
+
+
+
+
 
 // ========================= EVENTS =========================
 
