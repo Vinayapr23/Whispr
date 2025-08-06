@@ -149,11 +149,11 @@ mod circuits {
     }
 
     // Return struct with both amounts
-#[derive(Debug, Clone)]
-pub struct SwapResult {
-    pub deposit_amount: u64,   
-    pub withdraw_amount: u64,   
-}
+    #[derive(Debug, Clone)]
+    pub struct SwapResult {
+        pub deposit_amount: u64,
+        pub withdraw_amount: u64,
+    }
 
     #[instruction]
     pub fn compute_swap(
@@ -166,10 +166,10 @@ pub struct SwapResult {
         // Return revealed struct
         let swap_amount = swap_amount_ctxt.to_arcis();
         let amount = swap_amount.amount;
-        
+
         // Implement constant product AMM formula: x * y = k
         let k = vault_x_amount * vault_y_amount;
-     
+
         // Always swapping X for Y
         let new_x = vault_x_amount + amount;
         let new_y = k / new_x;

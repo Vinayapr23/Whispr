@@ -275,7 +275,7 @@ pub mod whispr {
             computation_offset,
             args,
             vec![
-                 CallbackAccount {
+                CallbackAccount {
                     pubkey: ctx.accounts.user.key(),
                     is_writable: true,
                 },
@@ -343,21 +343,19 @@ pub mod whispr {
         ctx: Context<ComputeSwapCallback>,
         output: ComputationOutputs<ComputeSwapOutput>,
     ) -> Result<()> {
-
         // Extract results from MPC computation
         let swap_result = match output {
-            ComputationOutputs::Success(ComputeSwapOutput { field_0}) => field_0,
+            ComputationOutputs::Success(ComputeSwapOutput { field_0 }) => field_0,
             _ => return Err(ErrorCode::AbortedComputation.into()),
         };
 
         // Decrypt the results
-        // The circuit returns SwapResult 
-        let deposit_amount =swap_result.ciphertexts[0];
-           // u64::from_le_bytes(swap_result.ciphertexts[0][..8].try_into().unwrap());
+        // The circuit returns SwapResult
+        let deposit_amount = swap_result.ciphertexts[0];
+        // u64::from_le_bytes(swap_result.ciphertexts[0][..8].try_into().unwrap());
 
-        let withdraw_amount =swap_result.ciphertexts[1];
-            //u64::from_le_bytes(swap_result.ciphertexts[1][..8].try_into().unwrap());
-
+        let withdraw_amount = swap_result.ciphertexts[1];
+        //u64::from_le_bytes(swap_result.ciphertexts[1][..8].try_into().unwrap());
 
         emit!(ConfidentialSwapExecutedEvent {
             user: ctx.accounts.user.key(),
@@ -371,69 +369,63 @@ pub mod whispr {
         Ok(())
     }
 
+    pub fn execute_swap(ctx: Context<ExecuteSwap>, _deposit: u64, _withdraw: u64) -> Result<()> {
+        let deposit_amount = _deposit;
+        let withdraw_amount = _withdraw;
 
+        require!(
+            deposit_amount > 0 && withdraw_amount > 0,
+            ErrorCode::InvalidAmount
+        );
 
-pub fn execute_swap(ctx: Context<ExecuteSwap>) -> Result<()> {
-    
-    let deposit_amount =10; //ctx.accounts.swap_state.amount;   //hardcoded as of now due to decrption error
-    let withdraw_amount = 20;//ctx.accounts.swap_state.min_output;
-    
-    require!(deposit_amount > 0 && withdraw_amount > 0, ErrorCode::InvalidAmount);
-    
-    // NOW user signs and can authorize transfers
-    transfer(
-        CpiContext::new(
-            ctx.accounts.token_program.to_account_info(),
-            Transfer {
-                from: ctx.accounts.user_x.to_account_info(),
-                to: ctx.accounts.vault_x.to_account_info(),
-                authority: ctx.accounts.user.to_account_info(), 
-            },
-        ),
-        deposit_amount,
-    )?;
+        // NOW user signs and can authorize transfers
+        transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.user_x.to_account_info(),
+                    to: ctx.accounts.vault_x.to_account_info(),
+                    authority: ctx.accounts.user.to_account_info(),
+                },
+            ),
+            deposit_amount,
+        )?;
 
-    // Config authority transfers Y tokens to user
-    let seeds = &[
-        &b"config"[..],
-        &ctx.accounts.config.seed.to_le_bytes(),
-        &[ctx.accounts.config.config_bump],
-    ];
-    let signer_seeds = &[&seeds[..]];
+        // Config authority transfers Y tokens to user
+        let seeds = &[
+            &b"config"[..],
+            &ctx.accounts.config.seed.to_le_bytes(),
+            &[ctx.accounts.config.config_bump],
+        ];
+        let signer_seeds = &[&seeds[..]];
 
-    transfer(
-        CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            Transfer {
-                from: ctx.accounts.vault_y.to_account_info(),
-                to: ctx.accounts.user_y.to_account_info(),
-                authority: ctx.accounts.config.to_account_info(),
-            },
-            signer_seeds,
-        ),
-        withdraw_amount,
-    )?;
+        transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.vault_y.to_account_info(),
+                    to: ctx.accounts.user_y.to_account_info(),
+                    authority: ctx.accounts.config.to_account_info(),
+                },
+                signer_seeds,
+            ),
+            withdraw_amount,
+        )?;
 
-    // Mark as executed
-    ctx.accounts.swap_state.status = SwapStatus::Executed;
+        // Mark as executed
+        ctx.accounts.swap_state.status = SwapStatus::Executed;
 
-    // emit!(ConfidentialSwapExecutedEvent {
-    //     user: ctx.accounts.user.key(),
-    //     config: ctx.accounts.config.key(),
-    //     computation_offset: ctx.accounts.swap_state.computation_offset,
-    //     deposit_amount,
-    //     withdraw_amount,
-    // });
+        // emit!(ConfidentialSwapExecutedEvent {
+        //     user: ctx.accounts.user.key(),
+        //     config: ctx.accounts.config.key(),
+        //     computation_offset: ctx.accounts.swap_state.computation_offset,
+        //     deposit_amount,
+        //     withdraw_amount,
+        // });
 
-    Ok(())
+        Ok(())
+    }
 }
-
-}
-
-
-
-
-
 
 // ========================= STATE =========================
 
@@ -475,7 +467,7 @@ pub enum SwapStatus {
 }
 
 impl Space for SwapState {
-    const INIT_SPACE: usize = 8 + 32 + 32 + 8  + 8 + 8 + 1 + 8;
+    const INIT_SPACE: usize = 8 + 32 + 32 + 8 + 8 + 8 + 1 + 8;
 }
 
 // ========================= AMM ACCOUNTS =========================
@@ -649,7 +641,7 @@ pub struct Update<'info> {
 #[derive(Accounts)]
 #[instruction(computation_offset: u64)]
 pub struct ComputeSwap<'info> {
-   #[account(mut)]
+    #[account(mut)]
     pub payer: Signer<'info>,
     #[account(mut)]
     pub user: Signer<'info>,
@@ -774,13 +766,7 @@ pub struct ComputeSwapCallback<'info> {
     pub user_y: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
-    
 }
-
-
-
-
-
 
 #[init_computation_definition_accounts("compute_swap", payer)]
 #[derive(Accounts)]
@@ -795,7 +781,6 @@ pub struct InitComputeSwapCompDef<'info> {
     pub arcium_program: Program<'info, Arcium>,
     pub system_program: Program<'info, System>,
 }
-
 
 #[derive(Accounts)]
 pub struct ExecuteSwap<'info> {
@@ -833,15 +818,8 @@ pub struct ExecuteSwap<'info> {
     pub user_y: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
-        pub system_program: Program<'info, System>,
+    pub system_program: Program<'info, System>,
 }
-
-
-
-
-
-
-
 
 // ========================= EVENTS =========================
 

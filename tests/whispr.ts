@@ -32,7 +32,7 @@ import {
   getOrCreateAssociatedTokenAccount,
   getAccount,
 } from "@solana/spl-token";
-import { expect } from "chai";
+import { assert, expect } from "chai";
 import { SystemProgram, Keypair } from "@solana/web3.js";
 import { BN } from "@coral-xyz/anchor";
 import { associatedAddress } from "@coral-xyz/anchor/dist/cjs/utils/token";
@@ -316,12 +316,19 @@ describe("Whispr", () => {
 
     console.log(swapExecutedEvent);
 
-    let output = cipher.decrypt([swapExecutedEvent.depositAmount, swapExecutedEvent.withdrawAmount], swapExecutedEvent.nonce.toArrayLike(Buffer, "le", 16));
+    let output = cipher.decrypt(
+      [swapExecutedEvent.depositAmount, swapExecutedEvent.withdrawAmount],
+      swapExecutedEvent.nonce.toArrayLike(Buffer, "le", 16)
+    );
     console.log(`deposit amount is ${output[0]}`);
     console.log(`withdraw amount is ${output[1]}`);
+    const depositBN = new BN(output[0].toString());
+    const withdrawBN = new BN(output[1].toString());
+    const userXBefore = await getAccount(provider.connection, user_x);
+    const userYBefore = await getAccount(provider.connection, user_y);
 
     const executeTx = await program.methods
-      .executeSwap()
+      .executeSwap(depositBN, withdrawBN)
       .accountsPartial({
         user: user.publicKey,
         mintX: mint_x,
