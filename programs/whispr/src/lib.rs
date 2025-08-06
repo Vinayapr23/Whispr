@@ -365,7 +365,7 @@ pub mod whispr {
             computation_offset: ctx.accounts.swap_state.computation_offset,
             deposit_amount,
             withdraw_amount,
-       
+            nonce: swap_result.nonce,
         });
 
         Ok(())
@@ -899,6 +899,7 @@ pub struct ConfidentialSwapExecutedEvent {
     pub computation_offset: u64,
     pub deposit_amount: [u8; 32],
     pub withdraw_amount: [u8; 32],
+    pub nonce: u128,
     // pub is_x: bool,
 }
 
